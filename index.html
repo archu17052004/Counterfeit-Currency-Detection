@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Verification</title>
+    <style>
+        /* General Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Centering the entire page */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        /* Title Styling */
+        h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            color: #555;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        /* Styling for form containers */
+        form {
+            width: 100%;
+            max-width: 400px;
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.15);
+            margin-bottom: 20px;
+        }
+
+        /* Label styling */
+        label {
+            font-size: 1rem;
+            color: #555;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        /* File input styling */
+        input[type="file"] {
+            display: block;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        /* Button styling */
+        button {
+            display: inline-block;
+            width: 100%;
+            padding: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fff;
+            background-color: #28a745;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        /* Error message styling */
+        .error {
+            color: #d9534f;
+            font-size: 1rem;
+            margin-top: 10px;
+        }
+
+        /* Result message styling */
+        .result {
+            color: #28a745;
+            font-size: 1rem;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Currency Verification System</h1>
+
+    <!-- Form to upload datasets -->
+    <form id="datasetForm">
+        <h2>Upload Datasets</h2>
+        <label for="originalCurrency">Original Currency Dataset:</label>
+        <input type="file" id="originalCurrency" accept=".jpg, .jpeg, .png" required>
+        <br>
+        <label for="duplicateCurrency">Duplicate Currency Dataset:</label>
+        <input type="file" id="duplicateCurrency" accept=".jpg, .jpeg, .png" required>
+        <br>
+        <button type="submit">Upload Datasets</button>
+    </form>
+
+    <!-- Form to upload an image for verification -->
+    <form id="imageForm" style="margin-top: 20px;">
+        <h2>Verify Currency</h2>
+        <input type="file" id="currencyImage" accept="image/*" required>
+        <button type="submit">Verify</button>
+    </form>
+
+    <p class="error" id="errorMessage"></p>
+    <h2>Result:</h2>
+    <p class="result" id="resultMessage"></p>
+
+    <script>
+        // JavaScript functionality as provided
+        function calculateImageHash(base64Data) {
+            let hash = 0;
+            for (let i = 0; i < base64Data.length; i++) {
+                const char = base64Data.charCodeAt(i);
+                hash = (hash << 5) - hash + char;
+                hash |= 0;
+            }
+            return hash.toString();
+        }
+
+        async function readAndStoreImageHash(file, key) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const base64Data = event.target.result;
+                    const hash = calculateImageHash(base64Data);
+                    localStorage.setItem(key, hash);
+                    resolve();
+                };
+                reader.onerror = () => reject("Could not read the file.");
+                reader.readAsDataURL(file);
+            });
+        }
+
+        document.getElementById("datasetForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const originalCurrencyInput = document.getElementById("originalCurrency");
+            const duplicateCurrencyInput = document.getElementById("duplicateCurrency");
+            const errorMessage = document.getElementById("errorMessage");
+            const resultMessage = document.getElementById("resultMessage");
+
+            errorMessage.textContent = "";
+            resultMessage.textContent = "";
+
+            if (originalCurrencyInput.files.length === 0 || duplicateCurrencyInput.files.length === 0) {
+                errorMessage.textContent = "Please upload both datasets.";
+                return;
+            }
+
+            Promise.all([
+                readAndStoreImageHash(originalCurrencyInput.files[0], "originalCurrencyHash"),
+                readAndStoreImageHash(duplicateCurrencyInput.files[0], "duplicateCurrencyHash")
+            ])
+            .then(() => {
+                resultMessage.textContent = "Datasets uploaded successfully!";
+            })
+            .catch(error => {
+                errorMessage.textContent = error;
+                console.error("Error:", error);
+            });
+        });
+
+        document.getElementById("imageForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const currencyImage = document.getElementById("currencyImage").files[0];
+            const errorMessage = document.getElementById("errorMessage");
+            const resultMessage = document.getElementById("resultMessage");
+
+            errorMessage.textContent = "";
+            resultMessage.textContent = "";
+
+            if (!currencyImage) {
+                errorMessage.textContent = "Please upload an image for verification.";
+                return;
+            }
+
+            const originalHash = localStorage.getItem("originalCurrencyHash");
+            const duplicateHash = localStorage.getItem("duplicateCurrencyHash");
+
+            if (!originalHash || !duplicateHash) {
+                errorMessage.textContent = "Datasets are missing. Please upload the datasets first.";
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const uploadedImageBase64 = event.target.result;
+                const uploadedImageHash = calculateImageHash(uploadedImageBase64);
+
+                if (uploadedImageHash === originalHash) {
+                    resultMessage.textContent = "The currency is ORIGINAL.";
+                } else if (uploadedImageHash === duplicateHash) {
+                    resultMessage.textContent = "The currency is FAKE.";
+                } else {
+                    resultMessage.textContent = "Currency status could not be determined.";
+                }
+            };
+
+            reader.onerror = () => {
+                errorMessage.textContent = "Error reading the image file.";
+            };
+
+            reader.readAsDataURL(currencyImage);
+        });
+    </script>
+
+</body>
+</html>
